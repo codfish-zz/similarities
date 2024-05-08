@@ -1,0 +1,27 @@
+[[source]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+verify_ssl = true
+name = "pip_conf_index_global"
+
+[packages]
+text2vec = ">=1.2.8"
+jieba = ">=0.39"
+loguru = "*"
+pillow = "*"
+autofaiss = "*"
+fire = "*"
+fastapi = "*"
+uvicorn = "*"
+pydantic = "*"
+requests = "*"
+starlette = "*"
+gradio = "*"
+torch = "*"
+transformers = "*"
+opencv-python = "*"
+imagehash = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.10"

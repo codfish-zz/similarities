@@ -15,7 +15,12 @@ from PIL import Image
 from loguru import logger
 from torch import nn
 from tqdm import trange
-from transformers import ChineseCLIPProcessor, ChineseCLIPModel, CLIPProcessor, CLIPModel
+from transformers import (
+    ChineseCLIPProcessor,
+    ChineseCLIPModel,
+    CLIPProcessor,
+    CLIPModel,
+)
 
 
 class ClipModule(nn.Module):
@@ -32,29 +37,36 @@ class ClipModule(nn.Module):
     """
 
     def __init__(
-            self,
-            model_name_or_path: str = "OFA-Sys/chinese-clip-vit-base-patch16",
-            processor_name: str = None,
-            device: str = None,
-            is_chinese_model: bool = None,
+        self,
+        model_name_or_path: str = "OFA-Sys/chinese-clip-vit-base-patch16",
+        processor_name: str = None,
+        device: str = None,
+        is_chinese_model: bool = None,
     ):
         super(ClipModule, self).__init__()
+
         if device is None:
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
         else:
             self.device = device
+
         self.model_name_or_path = model_name_or_path
+
         if processor_name is None:
             processor_name = model_name_or_path
+
         if is_chinese_model is None:
-            is_chinese_model = 'chinese' in model_name_or_path
+            is_chinese_model = "chinese" in model_name_or_path
+
         self.is_chinese_model = is_chinese_model
+
         if is_chinese_model:
             self.model = ChineseCLIPModel.from_pretrained(model_name_or_path)
             self.processor = ChineseCLIPProcessor.from_pretrained(processor_name)
         else:
             self.model = CLIPModel.from_pretrained(model_name_or_path)
             self.processor = CLIPProcessor.from_pretrained(processor_name)
+
         logger.debug(f"Device: {self.device}")
         self.model.to(self.device)
 
@@ -65,17 +77,19 @@ class ClipModule(nn.Module):
         image_embeds = []
         text_embeds = []
 
-        if 'pixel_values' in features:
-            vision_outputs = self.model.vision_model(pixel_values=features['pixel_values'])
+        if "pixel_values" in features:
+            vision_outputs = self.model.vision_model(
+                pixel_values=features["pixel_values"]
+            )
             image_embeds = self.model.visual_projection(vision_outputs[1])
 
-        if 'input_ids' in features:
+        if "input_ids" in features:
             text_outputs = self.model.text_model(
-                input_ids=features.get('input_ids'),
-                attention_mask=features.get('attention_mask', None),
-                position_ids=features.get('position_ids', None),
-                output_attentions=features.get('output_attentions', None),
-                output_hidden_states=features.get('output_hidden_states', None),
+                input_ids=features.get("input_ids"),
+                attention_mask=features.get("attention_mask", None),
+                position_ids=features.get("position_ids", None),
+                output_attentions=features.get("output_attentions", None),
+                output_hidden_states=features.get("output_hidden_states", None),
             )
             if self.is_chinese_model:
                 # refer chinese clip: https://github.com/huggingface/transformers/blob/main/src/transformers/models/chinese_clip/modeling_chinese_clip.py#L1431
@@ -88,13 +102,13 @@ class ClipModule(nn.Module):
         image_features = iter(image_embeds)
         text_features = iter(text_embeds)
 
-        for idx, input_type in enumerate(features['image_text_info']):
+        for idx, input_type in enumerate(features["image_text_info"]):
             if input_type == 0:
                 sentence_embedding.append(next(image_features))
             else:
                 sentence_embedding.append(next(text_features))
 
-        features['embedding'] = torch.stack(sentence_embedding).float()
+        features["embedding"] = torch.stack(sentence_embedding).float()
 
         return features
 
@@ -116,8 +130,10 @@ class ClipModule(nn.Module):
         if len(images) == 0:
             images = None
 
-        inputs = self.processor(text=texts_values, images=images, return_tensors="pt", padding=True)
-        inputs['image_text_info'] = image_text_info
+        inputs = self.processor(
+            text=texts_values, images=images, return_tensors="pt", padding=True
+        )
+        inputs["image_text_info"] = image_text_info
         return inputs
 
     def save(self, output_path: str):
@@ -137,7 +153,7 @@ class ClipModule(nn.Module):
 
         if isinstance(text, dict):  # {key: value} case
             return len(next(iter(text.values())))
-        elif not hasattr(text, '__len__'):  # Object has no len() method
+        elif not hasattr(text, "__len__"):  # Object has no len() method
             return 1
         elif len(text) == 0 or isinstance(text[0], int):  # Empty string or list of ints
             return len(text)
@@ -155,14 +171,14 @@ class ClipModule(nn.Module):
         return batch
 
     def encode(
-            self,
-            sentences: Union[str, List[str], Image.Image, List[Image.Image]],
-            batch_size: int = 32,
-            show_progress_bar: bool = False,
-            convert_to_numpy: bool = True,
-            convert_to_tensor: bool = False,
-            normalize_embeddings: bool = False,
-            device: str = None,
+        self,
+        sentences: Union[str, List[str], Image.Image, List[Image.Image]],
+        batch_size: int = 32,
+        show_progress_bar: bool = False,
+        convert_to_numpy: bool = True,
+        convert_to_tensor: bool = False,
+        normalize_embeddings: bool = False,
+        device: str = None,
     ):
         """
         Computes sentence and images embeddings
@@ -184,7 +200,7 @@ class ClipModule(nn.Module):
             device = self.device
         self.model.eval()
         input_was_string = False
-        if isinstance(sentences, str) or not hasattr(sentences, '__len__'):
+        if isinstance(sentences, str) or not hasattr(sentences, "__len__"):
             sentences = [sentences]
             input_was_string = True
         self.model.to(device)
@@ -194,14 +210,16 @@ class ClipModule(nn.Module):
         length_sorted_idx = np.argsort([-self._text_length(sent) for sent in sentences])
         sentences_sorted = [sentences[idx] for idx in length_sorted_idx]
 
-        for start_index in trange(0, len(sentences), batch_size, desc="Batches", disable=not show_progress_bar):
-            sentences_batch = sentences_sorted[start_index:start_index + batch_size]
+        for start_index in trange(
+            0, len(sentences), batch_size, desc="Batches", disable=not show_progress_bar
+        ):
+            sentences_batch = sentences_sorted[start_index : start_index + batch_size]
             features = self.tokenize(sentences_batch)
             features = self.batch_to_device(features, device)
 
             with torch.no_grad():
                 out_features = self.forward(features)
-                embeddings = out_features['embedding']
+                embeddings = out_features["embedding"]
                 embeddings = embeddings.detach()
                 if normalize_embeddings:
                     embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=1)
@@ -232,14 +250,20 @@ class ClipModule(nn.Module):
         """
         if target_devices is None:
             if torch.cuda.is_available():
-                target_devices = ['cuda:{}'.format(i) for i in range(torch.cuda.device_count())]
+                target_devices = [
+                    "cuda:{}".format(i) for i in range(torch.cuda.device_count())
+                ]
             else:
                 logger.info("CUDA is not available. Start 4 CPU worker")
-                target_devices = ['cpu'] * 4
+                target_devices = ["cpu"] * 4
 
-        logger.info("Start multi-process pool on devices: {}".format(', '.join(map(str, target_devices))))
+        logger.info(
+            "Start multi-process pool on devices: {}".format(
+                ", ".join(map(str, target_devices))
+            )
+        )
 
-        ctx = mp.get_context('spawn')
+        ctx = mp.get_context("spawn")
         input_queue = ctx.Queue()
         output_queue = ctx.Queue()
         processes = []
@@ -248,35 +272,35 @@ class ClipModule(nn.Module):
             p = ctx.Process(
                 target=ClipModule._encode_multi_process_worker,
                 args=(cuda_id, self, input_queue, output_queue),
-                daemon=True
+                daemon=True,
             )
             p.start()
             processes.append(p)
 
-        return {'input': input_queue, 'output': output_queue, 'processes': processes}
+        return {"input": input_queue, "output": output_queue, "processes": processes}
 
     @staticmethod
     def stop_multi_process_pool(pool):
         """
         Stops all processes started with start_multi_process_pool
         """
-        for p in pool['processes']:
+        for p in pool["processes"]:
             p.terminate()
 
-        for p in pool['processes']:
+        for p in pool["processes"]:
             p.join()
             p.close()
 
-        pool['input'].close()
-        pool['output'].close()
+        pool["input"].close()
+        pool["output"].close()
 
     def encode_multi_process(
-            self,
-            sentences: Union[List[str], List[Image.Image]],
-            pool: Dict[str, object],
-            batch_size: int = 32,
-            normalize_embeddings: bool = False,
-            chunk_size: int = None
+        self,
+        sentences: Union[List[str], List[Image.Image]],
+        pool: Dict[str, object],
+        batch_size: int = 32,
+        normalize_embeddings: bool = False,
+        chunk_size: int = None,
     ):
         """
         This method allows to run encode() on multiple GPUs. The sentences are chunked into smaller packages
@@ -292,18 +316,24 @@ class ClipModule(nn.Module):
         """
 
         if chunk_size is None:
-            chunk_size = min(math.ceil(len(sentences) / len(pool["processes"]) / 10), 5000)
+            chunk_size = min(
+                math.ceil(len(sentences) / len(pool["processes"]) / 10), 5000
+            )
 
-        logger.debug(f"Chunk data into {math.ceil(len(sentences) / chunk_size)} packages of size {chunk_size}")
+        logger.debug(
+            f"Chunk data into {math.ceil(len(sentences) / chunk_size)} packages of size {chunk_size}"
+        )
 
-        input_queue = pool['input']
+        input_queue = pool["input"]
         last_chunk_id = 0
         chunk = []
 
         for sentence in sentences:
             chunk.append(sentence)
             if len(chunk) >= chunk_size:
-                input_queue.put([last_chunk_id, batch_size, chunk, normalize_embeddings])
+                input_queue.put(
+                    [last_chunk_id, batch_size, chunk, normalize_embeddings]
+                )
                 last_chunk_id += 1
                 chunk = []
 
@@ -311,13 +341,17 @@ class ClipModule(nn.Module):
             input_queue.put([last_chunk_id, batch_size, chunk, normalize_embeddings])
             last_chunk_id += 1
 
-        output_queue = pool['output']
-        results_list = sorted([output_queue.get() for _ in range(last_chunk_id)], key=lambda x: x[0])
+        output_queue = pool["output"]
+        results_list = sorted(
+            [output_queue.get() for _ in range(last_chunk_id)], key=lambda x: x[0]
+        )
         embeddings = np.concatenate([result[1] for result in results_list])
         return embeddings
 
     @staticmethod
-    def _encode_multi_process_worker(target_device: str, model, input_queue, results_queue):
+    def _encode_multi_process_worker(
+        target_device: str, model, input_queue, results_queue
+    ):
         """
         Internal working process to encode sentences in multi processes setup
         """
